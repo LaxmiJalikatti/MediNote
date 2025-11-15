@@ -46,6 +46,22 @@
         border-radius: 5px;
         margin-top: 5px;
         font-size: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    li button {
+        width: auto;
+        padding: 5px 10px;
+        background: #dc3545;
+        border: none;
+        color: white;
+        cursor: pointer;
+        border-radius: 5px;
+        font-size: 14px;
+    }
+    li button:hover {
+        background: #a71d2a;
     }
 </style>
 
@@ -56,8 +72,8 @@
     <h2>⏰ Medicine Reminder</h2>
 
     <input type="text" id="medicine" placeholder="Enter medicine name">
-
     <input type="time" id="time">
+    <input type="number" id="days" placeholder="Number of days" min="1">
 
     <button onclick="addReminder()">Add Reminder</button>
 
@@ -70,28 +86,41 @@
 </audio>
 
 <script>
-let reminders = [];
+let reminders = JSON.parse(localStorage.getItem("reminders") || "[]");
+
+// Display reminders on load
+updateReminderList();
 
 // Add reminder
 function addReminder() {
     let medicine = document.getElementById("medicine").value.trim();
     let time = document.getElementById("time").value;
+    let days = parseInt(document.getElementById("days").value);
 
-    if (!medicine || !time) {
-        alert("Please enter medicine name and time!");
+    if (!medicine || !time || !days) {
+        alert("Please enter medicine name, time, and number of days!");
         return;
     }
 
     reminders.push({
         medicine: medicine,
         time: time,
-        triggered: false
+        startDate: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+        repeatDays: days,
+        triggeredDates: []
     });
 
+    saveReminders();
     updateReminderList();
 
     document.getElementById("medicine").value = "";
     document.getElementById("time").value = "";
+    document.getElementById("days").value = "";
+}
+
+// Save to localStorage
+function saveReminders() {
+    localStorage.setItem("reminders", JSON.stringify(reminders));
 }
 
 // Show reminders
@@ -99,9 +128,19 @@ function updateReminderList() {
     let list = document.getElementById("reminderList");
     list.innerHTML = "";
 
-    reminders.forEach(r => {
+    reminders.forEach((r, index) => {
         let li = document.createElement("li");
-        li.textContent = `${r.medicine} - ${r.time}`;
+        li.textContent = `${r.medicine} - ${r.time} - ${r.repeatDays} day(s)`;
+        
+        let delBtn = document.createElement("button");
+        delBtn.textContent = "Delete";
+        delBtn.onclick = () => {
+            reminders.splice(index, 1);
+            saveReminders();
+            updateReminderList();
+        };
+        li.appendChild(delBtn);
+
         list.appendChild(li);
     });
 }
@@ -114,17 +153,27 @@ function triggerAlert(medicine) {
     speechSynthesis.speak(speak);
 }
 
-// Check every second
+// Check reminders every second
 setInterval(() => {
     let now = new Date();
     let currentTime =
         now.getHours().toString().padStart(2, '0') + ":" +
         now.getMinutes().toString().padStart(2, '0');
+    let today = now.toISOString().split('T')[0]; // YYYY-MM-DD
 
     reminders.forEach(r => {
-        if (!r.triggered && r.time === currentTime) {
-            r.triggered = true;  // prevent repeating
+        let start = new Date(r.startDate);
+        let end = new Date(start);
+        end.setDate(end.getDate() + r.repeatDays - 1);
+
+        // Trigger if today is within range and not already triggered today
+        if (r.time === currentTime &&
+            today >= r.startDate && today <= end.toISOString().split('T')[0] &&
+            !r.triggeredDates.includes(today)) {
+
+            r.triggeredDates.push(today); // mark today's alert done
             triggerAlert(r.medicine);
+            saveReminders();
         }
     });
 }, 1000);
@@ -132,4 +181,3 @@ setInterval(() => {
 
 </body>
 </html>
-
