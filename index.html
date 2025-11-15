@@ -1,203 +1,135 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MediNote - Medical Note Taker</title>
-  <style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medicine Reminder</title>
+
+<style>
     body {
-      font-family: sans-serif;
-      margin: 20px;
-      background-color: #f4f4f4;
+        font-family: Arial, sans-serif;
+        background: #eef2f3;
+        padding: 20px;
     }
     .container {
-      max-width: 800px;
-      margin: 0 auto;
-      background-color: #fff;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        max-width: 500px;
+        margin: auto;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
     }
-    h1, h2 {
-      color: #333;
-      text-align: center;
-    }
-    #controls {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 20px;
-      justify-content: center;
+    input, button {
+        width: 100%;
+        padding: 10px;
+        margin-top: 10px;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        font-size: 16px;
     }
     button {
-      padding: 10px 15px;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 16px;
+        background: #007bff;
+        color: white;
+        cursor: pointer;
     }
-    #startButton {
-      background-color: #4CAF50;
-      color: white;
+    button:hover {
+        background: #0056b3;
     }
-    #stopButton {
-      background-color: #f44336;
-      color: white;
-      display: none;
+    ul {
+        margin-top: 15px;
+        padding: 0;
     }
-    #noteText {
-      width: 100%;
-      min-height: 150px;
-      padding: 10px;
-      margin-bottom: 15px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      font-size: 16px;
-      box-sizing: border-box;
+    li {
+        list-style: none;
+        background: #d9eaff;
+        padding: 10px;
+        border-radius: 5px;
+        margin-top: 5px;
+        font-size: 16px;
     }
-    #summary {
-      background-color: #e9ecef;
-      padding: 10px;
-      border-radius: 5px;
-      margin-bottom: 15px;
-      display: none;
-    }
-    #summary h2 {
-      text-align: left;
-      margin-top: 0;
-      color: #555;
-    }
-    #saveButton {
-      background-color: #007bff;
-      color: white;
-      display: block;
-      margin: 0 auto;
-    }
-    #status {
-      text-align: center;
-      margin-bottom: 10px;
-      font-style: italic;
-      color: #777;
-    }
-  </style>
+</style>
+
 </head>
 <body>
-  <div class="container">
-    <h1>MediNote</h1>
-    <p id="status">Ready to take notes...</p>
-    <div id="controls">
-      <button id="startButton">Start Recording</button>
-      <button id="stopButton">Stop Recording</button>
-    </div>
-    <textarea id="noteText" placeholder="Medical notes will appear here..."></textarea>
-    <div id="summary">
-      <h2>Summary</h2>
-      <p id="summaryText">Summary will be generated here (requires backend processing).</p>
-    </div>
-    <button id="saveButton">Save Notes</button>
-  </div>
 
-  <script>
-    const startButton = document.getElementById('startButton');
-    const stopButton = document.getElementById('stopButton');
-    const noteTextarea = document.getElementById('noteText');
-    const summaryDiv = document.getElementById('summary');
-    const summaryTextParagraph = document.getElementById('summaryText');
-    const saveButton = document.getElementById('saveButton');
-    const statusDisplay = document.getElementById('status');
+<div class="container">
+    <h2>⏰ Medicine Reminder</h2>
 
-    let recognition;
-    let isRecording = false;
+    <input type="text" id="medicine" placeholder="Enter medicine name">
 
-    // Browser compatibility
-    window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if ('SpeechRecognition' in window) {
-      recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
+    <input type="time" id="time">
 
-      recognition.onstart = () => {
-        isRecording = true;
-        startButton.style.display = 'none';
-        stopButton.style.display = 'inline-block';
-        statusDisplay.textContent = 'Recording...';
-      };
+    <button onclick="addReminder()">Add Reminder</button>
 
-      recognition.onresult = (event) => {
-        let interimTranscript = '';
-        let finalTranscript = noteTextarea.value;
+    <ul id="reminderList"></ul>
+</div>
 
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript + " ";
-          } else {
-            interimTranscript += event.results[i][0].transcript;
-          }
+<!-- SOUND ALERT -->
+<audio id="alertSound">
+    <source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" type="audio/ogg">
+</audio>
+
+<script>
+let reminders = [];
+
+// Add reminder
+function addReminder() {
+    let medicine = document.getElementById("medicine").value.trim();
+    let time = document.getElementById("time").value;
+
+    if (!medicine || !time) {
+        alert("Please enter medicine name and time!");
+        return;
+    }
+
+    reminders.push({
+        medicine: medicine,
+        time: time,
+        triggered: false
+    });
+
+    updateReminderList();
+
+    document.getElementById("medicine").value = "";
+    document.getElementById("time").value = "";
+}
+
+// Show reminders
+function updateReminderList() {
+    let list = document.getElementById("reminderList");
+    list.innerHTML = "";
+
+    reminders.forEach(r => {
+        let li = document.createElement("li");
+        li.textContent = `${r.medicine} - ${r.time}`;
+        list.appendChild(li);
+    });
+}
+
+// Sound + Voice alert
+function triggerAlert(medicine) {
+    document.getElementById("alertSound").play();
+
+    let speak = new SpeechSynthesisUtterance("It's time to take " + medicine);
+    speechSynthesis.speak(speak);
+}
+
+// Check every second
+setInterval(() => {
+    let now = new Date();
+    let currentTime =
+        now.getHours().toString().padStart(2, '0') + ":" +
+        now.getMinutes().toString().padStart(2, '0');
+
+    reminders.forEach(r => {
+        if (!r.triggered && r.time === currentTime) {
+            r.triggered = true;  // prevent repeating
+            triggerAlert(r.medicine);
         }
-
-        noteTextarea.value = finalTranscript + interimTranscript;
-      };
-
-      recognition.onerror = (event) => {
-        console.error('Speech recognition error:', event.error);
-        statusDisplay.textContent = 'Speech recognition error occurred.';
-        stopRecording();
-      };
-
-      recognition.onend = () => {
-        isRecording = false;
-        startButton.style.display = 'inline-block';
-        stopButton.style.display = 'none';
-        statusDisplay.textContent = 'Ready to take notes...';
-      };
-    } else {
-      statusDisplay.textContent = 'Speech recognition is not supported in this browser.';
-      startButton.disabled = true;
-    }
-
-    startButton.addEventListener('click', () => {
-      if (recognition && !isRecording) recognition.start();
     });
+}, 1000);
+</script>
 
-    stopButton.addEventListener('click', () => {
-      if (recognition && isRecording) stopRecording();
-    });
-
-    function stopRecording() {
-      recognition.stop();
-    }
-
-    // Save notes to backend
-    saveButton.addEventListener('click', () => {
-      const notes = noteTextarea.value.trim();
-      if (notes) {
-        const patientName = prompt("Enter patient name:");
-        const patientId = prompt("Enter patient ID:");
-
-        fetch("http://127.0.0.1:5000/save", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            patient_name: patientName,
-            patient_id: patientId,
-            notes: notes
-          }),
-        })
-        .then(response => response.json())
-        .then(data => {
-          alert(data.message);
-          console.log("Saved:", data);
-        })
-        .catch(error => {
-          console.error("Error saving notes:", error);
-          alert("Error saving notes.");
-        });
-      } else {
-        alert("No notes to save.");
-      }
-    });
-  </script>
 </body>
 </html>
+
